@@ -4,7 +4,7 @@ import tempfile
 import wave
 from openai import OpenAI
 
-client = OpenAI(api_key="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")  
+client = OpenAI(api_key="APIKEYHERE")  
 
 # -------- RECORD SPEECH --------
 def record_audio(duration=5, samplerate=44100):
