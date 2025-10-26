@@ -1,63 +1,60 @@
-import queue
 import sounddevice as sd
 import numpy as np
-import whisper
-import threading
-import time
-import openai
-import warnings
+import tempfile
+import wave
+from openai import OpenAI
 
+client = OpenAI(api_key="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")  
 
-# Suppress FP16 warning on CPU
-warnings.filterwarnings("ignore", message="FP16 is not supported on CPU; using FP32 instead")
+# -------- RECORD SPEECH --------
+def record_audio(duration=5, samplerate=44100):
+    print("🎤 Speak now...")
+    recording = sd.rec(int(duration * samplerate), samplerate=samplerate, channels=1, dtype='int16')
+    sd.wait()
+    print("✅ Recording finished.")
+    return recording, samplerate
 
-# Load Whisper model
-model = whisper.load_model("tiny")
+# -------- SAVE TEMP WAV --------
+def save_temp_wav(audio_data, samplerate):
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+    with wave.open(tmp.name, 'wb') as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(samplerate)
+        wf.writeframes(audio_data.tobytes())
+    return tmp.name
 
-# Audio settings
-SAMPLE_RATE = 16000  # Whisper works best at 16 kHz
-CHUNK_DURATION = 5   # seconds per chunk
-CHUNK_SIZE = SAMPLE_RATE * CHUNK_DURATION
+# -------- TRANSCRIBE --------
+def transcribe_audio(file_path):
+    with open(file_path, "rb") as f:
+        # transcription = client.audio.transcriptions.create(
+        #     model="gpt-4o-mini-transcribe",  # or "whisper-1"
+        #     file=f
+        # )
+        transcription = client.audio.transcriptions.create(
+    model="whisper-1",  # cheaper and less quota-heavy
+    file=f
+    )
+    return transcription.text
 
-audio_queue = queue.Queue()
+# -------- GET GPT RESPONSE --------
+def get_gpt_response(prompt):
+    completion = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "You are a friendly assistant."},
+            {"role": "user", "content": prompt}
+        ]
+    )
+    return completion.choices[0].message.content
 
-def audio_callback(indata, frames, time_info, status):
-    """Callback function called by sounddevice for each audio chunk"""
-    if status:
-        print(status)
-    audio_queue.put(indata.copy())
-
-def process_audio_queue():
-    """Continuously process audio chunks from the queue"""
-    try:
-        while True:
-            audio_chunk = audio_queue.get()
-            audio_data = np.squeeze(audio_chunk)
-
-            # Whisper expects float32 in [-1, 1], which we already have
-            result = model.transcribe(audio_data, fp16=False, language=None)
-            text = result["text"].strip()
-            if text:
-                print(f"🗣️ {text}")
-
-    except KeyboardInterrupt:
-        print("\n⏹️ Stopped listening. Goodbye!")
-
-def main():
-    print("🎙️ Listening... Speak into your mic.")
-    
-    # Start processing thread
-    threading.Thread(target=process_audio_queue, daemon=True).start()
-    
-    # Open microphone stream
-    with sd.InputStream(
-        samplerate=SAMPLE_RATE,
-        channels=1,
-        callback=audio_callback,
-        blocksize=CHUNK_SIZE
-    ):
-        while True:
-            time.sleep(0.1)  # Keep main thread alive
-
+# -------- MAIN LOOP --------
 if __name__ == "__main__":
-    main()
+    audio, sr = record_audio(duration=5)
+    wav_path = save_temp_wav(audio, sr)
+
+    text = transcribe_audio(wav_path)
+    print(f"\n🗣️ You said: {text}")
+
+    reply = get_gpt_response(text)
+    print(f"\n🤖 GPT says: {reply}\n")
