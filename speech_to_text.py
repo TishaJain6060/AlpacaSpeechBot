@@ -1,60 +1,78 @@
+import queue
 import sounddevice as sd
 import numpy as np
-import tempfile
-import wave
-from openai import OpenAI
+import whisper
+import threading
+import time
+import warnings
+import os
+import google.generativeai as genai
 
-client = OpenAI(api_key="APIKEYHERE")  
+genai.configure(api_key="Key")
+gemini_model = genai.GenerativeModel("gemini-2.0-flash")
 
-# -------- RECORD SPEECH --------
-def record_audio(duration=5, samplerate=44100):
-    print("🎤 Speak now...")
-    recording = sd.rec(int(duration * samplerate), samplerate=samplerate, channels=1, dtype='int16')
-    sd.wait()
-    print("✅ Recording finished.")
-    return recording, samplerate
+# --- CONFIG ---
+warnings.filterwarnings("ignore", message="FP16 is not supported on CPU; using FP32 instead")
+SAMPLE_RATE = 16000
+CHUNK_DURATION = 0.5
+CHUNK_SIZE = int(SAMPLE_RATE * CHUNK_DURATION)
+BUFFER_DURATION = 3
+BUFFER_SIZE = int(SAMPLE_RATE * BUFFER_DURATION)
 
-# -------- SAVE TEMP WAV --------
-def save_temp_wav(audio_data, samplerate):
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-    with wave.open(tmp.name, 'wb') as wf:
-        wf.setnchannels(1)
-        wf.setsampwidth(2)
-        wf.setframerate(samplerate)
-        wf.writeframes(audio_data.tobytes())
-    return tmp.name
+# --- Gemini Setup ---
+# genai.configure(api_key=os.getenv("AIzaSyAwRx55yf-VQ1I4ycZT6dgxCe26dREuOzI"))
+# gemini_model = genai.GenerativeModel("gemini-2.0-flash")  
 
-# -------- TRANSCRIBE --------
-def transcribe_audio(file_path):
-    with open(file_path, "rb") as f:
-        # transcription = client.audio.transcriptions.create(
-        #     model="gpt-4o-mini-transcribe",  # or "whisper-1"
-        #     file=f
-        # )
-        transcription = client.audio.transcriptions.create(
-    model="whisper-1",  # cheaper and less quota-heavy
-    file=f
-    )
-    return transcription.text
+# --- Whisper Setup ---
+model = whisper.load_model("base")
 
-# -------- GET GPT RESPONSE --------
-def get_gpt_response(prompt):
-    completion = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": "You are a friendly assistant."},
-            {"role": "user", "content": prompt}
-        ]
-    )
-    return completion.choices[0].message.content
+audio_queue = queue.Queue()
+audio_buffer = np.zeros(BUFFER_SIZE, dtype=np.float32)
+last_time = time.time()
 
-# -------- MAIN LOOP --------
+def generate_gemini_response(prompt: str):
+    """Send the transcribed text to Gemini and print the response."""
+    print("🤖 Thinking...")
+    try:
+        # response = gemini_model.generate_content(prompt)
+        response = gemini_model.generate_content(prompt)
+        print("-" * 50)
+        print(f"🤖 GEMINI RESPONSE:\n{response.text}")
+        print("-" * 50)
+    except Exception as e:
+        print(f"❌ Gemini Error: {e}")
+
+def audio_callback(indata, frames, time_info, status):
+    if status:
+        print(status)
+    audio_queue.put(indata.copy())
+
+def process_audio_queue():
+    global audio_buffer, last_time
+    while True:
+        chunk = audio_queue.get()
+        chunk = np.squeeze(chunk)
+        audio_buffer = np.roll(audio_buffer, -len(chunk))
+        audio_buffer[-len(chunk):] = chunk
+
+        # Throttle: only process every 2 seconds
+        if time.time() - last_time < 2:
+            continue
+        last_time = time.time()
+
+        result = model.transcribe(audio_buffer, fp16=False)
+        text = result["text"].strip()
+        if len(text) > 3:
+            print(f"🗣️ User: {text}")
+            audio_buffer[:] = 0
+            threading.Thread(target=generate_gemini_response, args=(text,), daemon=True).start()
+
+def main():
+    print("🎙️ Listening... Speak into your mic.")
+    threading.Thread(target=process_audio_queue, daemon=True).start()
+    with sd.InputStream(samplerate=SAMPLE_RATE, channels=1, callback=audio_callback, blocksize=CHUNK_SIZE):
+        while True:
+            time.sleep(0.1)
+
 if __name__ == "__main__":
-    audio, sr = record_audio(duration=5)
-    wav_path = save_temp_wav(audio, sr)
-
-    text = transcribe_audio(wav_path)
-    print(f"\n🗣️ You said: {text}")
-
-    reply = get_gpt_response(text)
-    print(f"\n🤖 GPT says: {reply}\n")
+    main()
