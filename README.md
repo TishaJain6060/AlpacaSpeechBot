@@ -1,129 +1,110 @@
-Gemini Voice Assistant with Piper TTS
 
-A local voice assistant that listens to your speech, queries Google Gemini for responses, and speaks them using Piper TTS. Interaction is intentended for integration with AgileX robot for an interactive robot.
+# Description
 
-Features
+This program converts speech to text using OpenAI Whisper, generates responses using Google Gemini, and speaks responses with Piper TTS. Interaction is intentended for integration with AgileX robot for an interactive robot.
 
-Live speech recognition using speech_recognition
+# Requirements
 
-Google Gemini integration via google-generativeai
+Python 3.10+
 
-High-quality local text-to-speech using Piper TTS
+sounddevice (for audio input/output)
 
-Fully dynamic: multiple interactions, no pyttsx3 issues
+numpy
 
-Exit program with trigger phrase "thank you"
+whisper (OpenAI Whisper)
 
-Dependencies
-Python
+piper-tts (Piper TTS)
 
-Python 3.10+ recommended
+google-genai (Gemini API)
 
-Python Packages
+# Installation
+1️. Clone this repository
+git clone <repo-url>
+cd gemini_voice_assistant
 
-Install via pip:
+2️. Install dependencies
 
-pip install speechrecognition
-pip install google-generativeai
-pip install piper-tts
-pip install sounddevice
-pip install numpy
-pip install onnxruntime
+Create a requirements.txt:
 
-
-⚠️ For GPU acceleration of Piper TTS (optional):
-
-pip install onnxruntime-gpu
-
-OS-Specific Notes
-Windows
-
-Ensure you have Visual C++ Redistributable installed (required by onnxruntime)
-
-Use a microphone compatible with speech_recognition
-
-sounddevice may require portaudio which is bundled in pip wheels
-
-macOS
-
-sounddevice requires portaudio:
-
-brew install portaudio
+sounddevice
+numpy
+whisper
+piper-tts
+google-genai
 
 
-Use the built-in microphone or an external USB mic
+Then install:
 
-Setup
+# Linux
+python3 -m pip install -r requirements.txt
 
-Clone or download this repository
+# Windows
+python -m pip install -r requirements.txt
 
-Download a Piper voice
-
-Example using Piper CLI:
-
+3️. Download a Piper voice
 python -m piper.download_voices en_US-lessac-medium
 
 
-This will download the .onnx file (e.g., en_US-lessac-medium.onnx) into your directory.
+This will generate a .onnx file (e.g., en_US-lessac-medium.onnx) that you will use in the script.
 
-Update voice path in the script
+4️. Set Google Gemini API Key
 
-voice_path = "en_US-lessac-medium.onnx"
+Linux/macOS:
+
+export GEMINI_API_KEY="your_api_key_here"
 
 
-Set your Google Gemini API key
+Windows (PowerShell):
 
-GEMINI_API_KEY = "YOUR_KEY_HERE"
+setx GEMINI_API_KEY "your_api_key_here"
 
 Usage
 
-Run the script:
+Run the voice assistant:
 
 python speech_to_text.py
 
 
-Speak into your microphone
+Speak into your microphone.
 
-Gemini will respond to your input
+Say "thank you" to exit the program.
 
-The response will be spoken out loud using Piper TTS
+The pipeline will:
 
-Say "thank you" to exit the program
+Transcribe your speech using Whisper.
 
-Configuration
-Piper TTS Synthesis Parameters
-syn_config = SynthesisConfig(
-    volume=0.8,          # Voice volume (0-1)
-    length_scale=1.0,    # Speed modifier (>1 = slower)
-    noise_scale=0.6,     # Controls audio variation
-    noise_w_scale=0.6,   # Controls prosody variation
-    normalize_audio=True # Keep waveform normalized
-)
+Generate a response using Gemini LLM.
 
-Gemini Model
-gemini_model = genai.GenerativeModel("gemini-2.0-flash")
+Speak the response using Piper TTS.
 
 Notes
 
-Works offline for TTS; online only for Gemini API calls
+Whisper does not require an API key.
 
-The first interaction may have a small delay due to microphone calibration and TTS initialization
+Gemini requires a valid API key; ensure it’s set in your environment.
 
-Compatible with multiple Piper voices — simply replace .onnx file
+Piper can optionally use GPU if you have onnxruntime-gpu installed.
 
-If using requirements.txt 
-Save requirements.txt in the same directory as your script.
+You can adjust volume, speed, and other TTS settings in the script via SynthesisConfig.
 
-Install all dependencies:
+# Directory Structure
+gemini_voice_assistant/
+│
+├── speech_to_text.py      # main modular voice assistant script
+├── en_US-lessac-medium.onnx  # Piper voice file
+├── requirements.txt
+└── README.md
 
-pip install -r requirements.txt
+# Supported Platforms
+Platform	Notes
+Windows 10+	Works with default Python audio drivers.
+Linux (Ubuntu/Debian)	May require libasound2-dev for sounddevice.
+Troubleshooting
 
+Whisper errors: Ensure your microphone is working and the sampling rate is set to 16kHz.
 
-⚠️ On macOS, make sure PortAudio is installed for sounddevice:
+Gemini errors: Verify your API key is correct and the model exists (gemini-2.0-flash or latest).
 
-brew install portaudio
+Piper errors: Ensure the .onnx voice file exists and piper-tts is installed.
 
-
-Optional for GPU:
-
-pip install onnxruntime-gpu
+Latency: For benchmarking, enable print statements in STT/LLM/TTS functions.

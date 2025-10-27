@@ -1,84 +1,120 @@
-import speech_recognition as sr
-import google.generativeai as genai
-from piper import PiperVoice, SynthesisConfig
+import queue
 import sounddevice as sd
 import numpy as np
-import wave
+import whisper
+import threading
 import time
+import warnings
+import wave
+from google import genai
+from google.genai.types import GenerateContentConfig
+from piper import PiperVoice
 
-# ========== CONFIG ==========
-GEMINI_API_KEY = "YourKey"
-genai.configure(api_key=GEMINI_API_KEY)
-gemini_model = genai.GenerativeModel("gemini-2.0-flash")
+# =====================================
+# CONFIG
+# =====================================
+warnings.filterwarnings("ignore", message="FP16 is not supported on CPU; using FP32 instead")
 
-# ========== LOAD TTS VOICE ==========
-voice_path = "en_US-lessac-medium.onnx"  # path to downloaded Piper voice
-voice = PiperVoice.load(voice_path, use_cuda=False)  # Set True if you have GPU & onnxruntime-gpu
+SAMPLE_RATE = 16000
+CHUNK_DURATION = 5
+CHUNK_SIZE = SAMPLE_RATE * CHUNK_DURATION
 
-# Optional: customize synthesis parameters
-syn_config = SynthesisConfig(
-    volume=0.8,
-    length_scale=1.0,
-    noise_scale=0.6,
-    noise_w_scale=0.6,
-    normalize_audio=True
-)
+# Initialize modules
+print("🔧 Loading Whisper model (tiny)...")
+model = whisper.load_model("tiny")
 
-# ========== FUNCTIONS ==========
-def ask_gemini(prompt):
+print("🔧 Loading Piper voice...")
+voice = PiperVoice.load("en_US-lessac-medium.onnx")
+
+print("🔧 Initializing Gemini...")
+gemini_client = genai.Client(api_key= "KEY")
+
+audio_queue = queue.Queue()
+
+# =====================================
+# AUDIO STREAMING (STT)
+# =====================================
+def audio_callback(indata, frames, time_info, status):
+    if status:
+        print(status)
+    audio_queue.put(indata.copy())
+
+def whisper_process():
+    """Continuously process chunks from mic -> Whisper -> Gemini -> Piper"""
+    while True:
+        audio_chunk = audio_queue.get()
+        audio_data = np.squeeze(audio_chunk)
+        result = model.transcribe(audio_data, fp16=False, language=None)
+        text = result["text"].strip()
+
+        if text:
+            print(f"\n🗣️ You said: {text}")
+            threading.Thread(target=handle_llm_and_tts, args=(text,), daemon=True).start()
+
+# =====================================
+# GEMINI (LLM)
+# =====================================
+def generate_gemini_response(prompt: str) -> str:
     try:
-        response = gemini_model.generate_content(prompt)
-        return response.text.strip()
+        response = gemini_client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt,
+            config=GenerateContentConfig(temperature=0.7)
+        )
+        text = response.text.strip()
+        print(f"🤖 Gemini: {text}")
+        return text
     except Exception as e:
-        return f"❌ Gemini Error: {e}"
+        print(f"❌ Gemini error: {e}")
+        return "Sorry, I ran into an issue generating a response."
 
-def speak_text(text):
-    # Synthesizes audio in memory
-    audio_chunks = voice.synthesize(text, syn_config=syn_config)
-    for chunk in audio_chunks:
-        # chunk.audio_int16_bytes is the raw PCM data
-        audio_data = np.frombuffer(chunk.audio_int16_bytes, dtype=np.int16).astype(np.float32)
-        audio_data /= 32768.0  # scale int16 to float32
-        sd.play(audio_data, samplerate=chunk.sample_rate)
-        sd.wait()  # wait for chunk to finish
+# =====================================
+# PIPER (TTS)
+# =====================================
+def speak_text(text: str):
+    try:
+        output_file = "gemini_reply.wav"
+        with wave.open(output_file, "wb") as wav_file:
+            voice.synthesize_wav(text, wav_file)
+        with wave.open(output_file, "rb") as wf:
+            data = wf.readframes(wf.getnframes())
+            audio = np.frombuffer(data, dtype=np.int16)
+            sd.play(audio, wf.getframerate())
+            sd.wait()
+        print("🔊 Finished speaking.")
+    except Exception as e:
+        print(f"❌ Piper error: {e}")
 
-# ========== MAIN LOOP ==========
-recognizer = sr.Recognizer()
+# =====================================
+# PIPELINE HANDLER
+# =====================================
+def handle_llm_and_tts(user_text: str):
+    """Run Gemini + TTS asynchronously for each detected phrase"""
+    start = time.time()
+    response = generate_gemini_response(user_text)
+    mid = time.time()
+    speak_text(response)
+    end = time.time()
+    print(f"⏱️ Gemini latency: {mid - start:.2f}s | TTS latency: {end - mid:.2f}s")
 
+# =====================================
+# MAIN
+# =====================================
 def main():
-    print("\n🎤 Speak now! Say 'thank you' to exit.\n")
-    with sr.Microphone() as source:
-        recognizer.adjust_for_ambient_noise(source, duration=0.5)
-        while True:
-            try:
-                print("🗣️ Listening...")
-                audio = recognizer.listen(source, phrase_time_limit=10)
-                user_text = recognizer.recognize_google(audio).strip()
-                print(f"\n🗣️ You said: {user_text}")
+    print("🎙️ Listening... Speak into your mic (Ctrl+C to stop).")
+    threading.Thread(target=whisper_process, daemon=True).start()
 
-                if "thank you" in user_text.lower():
-                    print("\n👋 Exiting program. Goodbye!")
-                    speak_text("Goodbye!")
-                    break
-
-                # Ask Gemini
-                print("🤖 Thinking...")
-                reply = ask_gemini(user_text)
-                print(f"💬 Gemini: {reply}\n")
-
-                # Speak Gemini reply
-                speak_text(reply)
-
-            except sr.UnknownValueError:
-                print("❌ Didn't catch that. Try again.")
-            except sr.RequestError as e:
-                print(f"⚠️ Could not request results; {e}")
-            except KeyboardInterrupt:
-                print("\n🛑 Interrupted manually. Exiting.")
-                break
-            time.sleep(0.5)
+    with sd.InputStream(
+        samplerate=SAMPLE_RATE,
+        channels=1,
+        callback=audio_callback,
+        blocksize=CHUNK_SIZE,
+    ):
+        try:
+            while True:
+                time.sleep(0.1)
+        except KeyboardInterrupt:
+            print("\n⏹️ Stopped listening. Goodbye!")
 
 if __name__ == "__main__":
     main()
-
-
