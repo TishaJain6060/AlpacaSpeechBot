@@ -18,11 +18,11 @@ piper-tts (Piper TTS)
 google-genai (Gemini API)
 
 # Installation
-1️. Clone this repository
+## 1️. Clone this repository
 git clone <repo-url>
 cd gemini_voice_assistant
 
-2️. Install dependencies
+## 2️. Install dependencies
 
 Create a requirements.txt:
 
@@ -35,19 +35,19 @@ google-genai
 
 Then install:
 
-# Linux
+Linux
 python3 -m pip install -r requirements.txt
 
-# Windows
+Windows
 python -m pip install -r requirements.txt
 
-3️. Download a Piper voice
+## 3️. Download a Piper voice
 python -m piper.download_voices en_US-lessac-medium
 
 
 This will generate a .onnx file (e.g., en_US-lessac-medium.onnx) that you will use in the script.
 
-4️. Set Google Gemini API Key
+## 4️. Set Google Gemini API Key
 
 Linux/macOS:
 
@@ -58,7 +58,7 @@ Windows (PowerShell):
 
 setx GEMINI_API_KEY "your_api_key_here"
 
-Usage
+# Usage
 
 Run the voice assistant:
 
@@ -77,7 +77,7 @@ Generate a response using Gemini LLM.
 
 Speak the response using Piper TTS.
 
-Notes
+# Notes
 
 Whisper does not require an API key.
 
@@ -96,7 +96,8 @@ gemini_voice_assistant/
 └── README.md
 
 # Supported Platforms
-Platform	Notes
+
+## Platform	Notes
 Windows 10+	Works with default Python audio drivers.
 Linux (Ubuntu/Debian)	May require libasound2-dev for sounddevice.
 Troubleshooting
