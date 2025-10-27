@@ -13,8 +13,5 @@ sounddevice>=0.4.7
 # Audio processing
 numpy>=1.25.0
 
-# ONNX runtime for Piper TTS
-onnxruntime>=1.15.1
-
 # Optional: GPU acceleration for Piper TTS (replace onnxruntime with this if using GPU)
 # onnxruntime-gpu>=1.15.1
