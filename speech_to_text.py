@@ -8,7 +8,7 @@ import warnings
 import os
 import google.generativeai as genai
 
-genai.configure(api_key="AIzaSyAwRx55yf-VQ1I4ycZT6dgxCe26dREuOzI")
+genai.configure(api_key="Key")
 gemini_model = genai.GenerativeModel("gemini-2.0-flash")
 
 # --- CONFIG ---
