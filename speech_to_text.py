@@ -6,6 +6,7 @@ import threading
 import time
 import warnings
 import wave
+import re
 from google import genai
 from google.genai.types import GenerateContentConfig
 from piper import PiperVoice
@@ -141,13 +142,42 @@ class TextToSpeech:
         print("🔧 Loading Piper voice...")
         self.voice = PiperVoice.load(voice_file)
 
+    def _clean_text(self, text: str) -> str:
+        """Removes markdown and redundant characters before TTS."""
+        import re
+        
+        # 1. Remove Markdown Bolding/Italics (* and _)
+        # This covers cases like **word** or *word*
+        text = text.replace('*', '').replace('_', '')
+        
+        # 2. Remove Redundant/Specific Punctuation
+        # Remove slashes, pipes, brackets, and similar non-verbal characters
+        # Commas (,), periods (.), question marks (?), and exclamation points (!) 
+        # are generally kept as they affect natural pausing/intonation.
+        text = re.sub(r'[\\/|\[\]{}()]', '', text)
+        
+        # 3. Handle excessive whitespace created by removal
+        text = re.sub(r'\s+', ' ', text).strip()
+        
+        return text
+
     def speak(self, text: str):
         """Synthesizes text and plays the audio."""
+        
+        # NEW: Clean the text before speaking
+        cleaned_text = self._clean_text(text)
+        
+        if not cleaned_text:
+            print("🔊 TTS skipped: Cleaned text was empty.")
+            return
+
+        print(f"🔊 Speaking text: {cleaned_text}")
+        
         try:
             output_file = "gemini_reply.wav"
-            # Synthesize to WAV file
+            # Synthesize to WAV file using the cleaned text
             with wave.open(output_file, "wb") as wav_file:
-                self.voice.synthesize_wav(text, wav_file)
+                self.voice.synthesize_wav(cleaned_text, wav_file)
             
             # Read and Play the WAV file
             with wave.open(output_file, "rb") as wf:
