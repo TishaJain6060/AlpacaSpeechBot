@@ -26,7 +26,7 @@ RMS_THRESHOLD = 0.015  # Volume threshold for noise gate (adjust as needed)
 WHISPER_MODEL_NAME = "tiny"
 GEMINI_MODEL_NAME = "gemini-2.0-flash"
 PIPER_VOICE_FILE = "en_US-lessac-medium.onnx"
-GEMINI_API_KEY = "YourKey" 
+GEMINI_API_KEY = "AIzaSyAwRx55yf-VQ1I4ycZT6dgxCe26dREuOzI"
 
 # Global Queue & State
 audio_queue = queue.Queue()
@@ -288,7 +288,7 @@ def main():
     # 2. Start the transcription loop in a dedicated thread
     whisper_thread = threading.Thread(
         target=stt_engine.run_transcription_loop, 
-        args=(pipeline_handler,), 
+       args=(pipeline_handler,), 
         daemon=True
     )
     whisper_thread.start()
