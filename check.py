@@ -338,7 +338,8 @@ audio_queue = queue.Queue()
 exit_flag = threading.Event()
 listening_active = False  # becomes True after wake word
 
-
+#this is a comment
+#this is comment 2
 
 # =====================================
 # AUDIO CAPTURE
