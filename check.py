@@ -304,14 +304,14 @@ import os
 warnings.filterwarnings("ignore", message="FP16 is not supported on CPU; using FP32 instead")
 
 SAMPLE_RATE = 16000
-CHUNK_DURATION = 8
+CHUNK_DURATION = 7
 CHUNK_SIZE = SAMPLE_RATE * CHUNK_DURATION
 RMS_THRESHOLD = 0.015
 
 WHISPER_MODEL_NAME = "tiny"
 
 # Silence shutdown timeout
-SILENCE_TIMEOUT = 15
+SILENCE_TIMEOUT = 10
 last_voice_time = time.time()
 
 # Wake word regex

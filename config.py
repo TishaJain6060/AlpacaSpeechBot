@@ -7,7 +7,7 @@ warnings.filterwarnings("ignore", message="FP16 is not supported on CPU; using F
 
 # --- Audio Configuration ---
 SAMPLE_RATE = 16000
-CHUNK_DURATION = 5          # seconds
+CHUNK_DURATION = 20      # seconds
 CHUNK_SIZE = SAMPLE_RATE * CHUNK_DURATION
 RMS_THRESHOLD = 0.015       # Volume threshold for noise gate
 

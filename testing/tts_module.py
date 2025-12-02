@@ -11,7 +11,7 @@ import os
 import numpy as np
 
 # =====================================
-# CORE CLASS: TextToSpeech
+# TextToSpeech
 # =====================================
 
 class TextToSpeech:
@@ -82,16 +82,22 @@ class TextToSpeech:
         
 
 # =====================================
-# STANDALONE TEST SCRIPT (Latency & RTF)
+# TEST SCRIPT (Latency & RTF)
 # =====================================
 
 def main_test_tts():
     """Function to run the TTS latency and RTF test with percentiles."""
     
     # --- CONFIGURATION ---
-    # The text to synthesize and test latency on. Should be a typical response length (e.g., 20-40 words).
-    TEST_PHRASE = "The examination and testimony of the experts enabled the Commission to conclude that five shots may have been fired."
-    NUM_RUNS = 20 # Run enough times for statistical stability
+    # The new, longer text (approx. 70 words) for a sustained load test.
+    TEST_PHRASE = (
+        "It is a truth universally acknowledged that a single man in possession of a good fortune "
+        "must be in want of a wife. However little known the feelings or views of such a man may be "
+        "on his first entering a neighborhood, this truth is so well fixed in the minds of the "
+        "surrounding families that he is considered the rightful property of some one or other of their daughters."
+    )
+    # Use fewer runs for long audio since each run takes longer.
+    NUM_RUNS = 10
     # ---------------------
 
     print(f"--- TTS Latency Test ({NUM_RUNS} Runs) ---")
