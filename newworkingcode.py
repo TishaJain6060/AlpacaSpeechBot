@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 """
-GuideBot interaction pipeline (simplified & robust version)
+GuideBot interaction pipeline
 
-Key points:
-- Very close to your ORIGINAL logic.
-- Uses `awaiting_command` flag (no complex state machine).
-- Adds:
-    * STT muting while TTS is speaking (prevents hearing itself).
-    * Windows-safe TTS audio file handling.
-    * Slightly faster Whisper decoding.
-    * Cleaner LLM JSON parsing.
-- Still:
+Key TO KNOW for my dumbass:
+- Using `awaiting_command` flag
+- Core stuff:
+    * STT muting while TTS is speaking (prevents the stupid pc from hearing itself).
+    * Whisper stt.
+    * LLM JSON parsing.
+- Other:
     * Wake word → prompt → next utterance → LLM → prints room + coords.
 """
 
@@ -31,7 +29,7 @@ import wave
 # -----------------------------
 # CONFIGURATION
 # -----------------------------
-GENAI_API_KEY = "AIzaSyA3XsN_nLC8u5O65QvXSvLkLSrCvBb7p6s"
+GENAI_API_KEY = "Your Key"
 genai.configure(api_key=GENAI_API_KEY)
 
 WHISPER_MODEL = "small"
@@ -42,7 +40,7 @@ CHUNK_DURATION = 2   # seconds per audio chunk
 CHUNK_SIZE = SAMPLE_RATE * CHUNK_DURATION
 RMS_THRESHOLD = 0.01
 
-# Using your original wake phrases
+#  wake phrases
 WAKE_PHRASES = [
     "hey alpaca",
     "alpaca",
@@ -51,9 +49,7 @@ WAKE_PHRASES = [
     "help",
 ]
 
-# You weren't actually using this COMMAND_TIMEOUT in the original code,
-# so I'm leaving it here but not wiring it into complex logic.
-COMMAND_TIMEOUT = 15
+COMMAND_TIMEOUT = 15 # do i need this? bruh?
 
 ROOM_COORDS = {
     3140: [0.0, 17.706],
@@ -97,7 +93,7 @@ def state(msg):
 
 
 def debug(msg):
-    """For lighter debug logging."""
+    """For debug logging."""
     print(f"[DEBUG] {msg}")
     sys.stdout.flush()
 
@@ -135,7 +131,7 @@ class TTS:
         with wave.open(temp_file, "wb") as wf:
             self.voice.synthesize_wav(text, wf)
 
-        # Read entire file into memory (this avoids Windows lock during playback)
+        # Read entire file into memory (this is just to avoid my Windows lock during playback)
         with wave.open(temp_file, "rb") as wf:
             data = wf.readframes(wf.getnframes())
             framerate = wf.getframerate()
@@ -162,7 +158,7 @@ class TTS:
 
 
 # -----------------------------
-# STT WITH WHISPER (Live)
+# STT WITH WHISPER 
 # -----------------------------
 audio_queue = queue.Queue()
 
@@ -194,12 +190,12 @@ class STT:
     def transcribe_audio_chunk(self, audio_chunk):
         """
         Transcribe one chunk of audio.
-        We set beam_size=1 and vad_filter=False to make it faster.
+        Set beam_size=1 and vad_filter=False to make it faster
         """
         segments, _ = self.model.transcribe(
             audio_chunk,
             beam_size=1,      # faster than beam_size=5
-            vad_filter=False  # we already use an RMS-based VAD
+            vad_filter=False  # already using an RMS-based VAD
         )
         text = " ".join(segment.text for segment in segments).strip()
         return text.lower()
@@ -259,7 +255,7 @@ class LLMClient:
 
 
 # -----------------------------
-# Pipeline / GuideBot
+# Pipeline for GuideBot
 # -----------------------------
 class GuideBot:
     def __init__(self):
@@ -289,7 +285,7 @@ class GuideBot:
                 self.command_buffer = ""
         else:
             # We are in ACTIVE mode: buffer this entire chunk as "the command"
-            # (this is your original behavior — one chunk becomes the command)
+            # (basically one chunk becomes the command)
             self.command_buffer += " " + text
             utterance = self.command_buffer.strip()
             debug(f"Captured command utterance: {utterance!r}")
@@ -353,7 +349,7 @@ class GuideBot:
         )
         stt_thread.start()
 
-        state("GuideBot is running. Speak 'Hey Alpaca' to wake me up!")
+        state("Alpaca is running. Speak 'Help me, Alpaca', or 'Help'to wake me up!")
 
         try:
             while not self.exit_flag.is_set():
@@ -364,7 +360,7 @@ class GuideBot:
             self.exit_flag.set()
             if stream.active:
                 stream.stop()
-            print("GuideBot stopped.")
+            print("Alpaca stopped.")
 
 
 # -----------------------------
